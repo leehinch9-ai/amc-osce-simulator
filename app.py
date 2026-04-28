@@ -4,13 +4,12 @@ from supabase import create_client, Client
 from streamlit_mic_recorder import mic_recorder
 import openai
 import io
-import json
 
-# --- 1. CONFIGURATION ---
-SUPABASE_URL = "https://rmvabqsxupkaglxperuj.supabase.co"
-SUPABASE_KEY = st.secrets["sb_secret__nOuXZlGSf40iM1n9BaI1A_57Fj9PWJ"] 
-GROQ_API_KEY = "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"
-OPENAI_API_KEY = "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"
+# This tells the app to look in the 'Secrets' dashboard we just filled out
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 # Initialize Clients
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
