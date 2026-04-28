@@ -1,3 +1,5 @@
 streamlit
 groq
 supabase
+openai
+streamlit-mic-recorder
