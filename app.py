@@ -115,10 +115,15 @@ st.title("🩺 AMC Clinical OSCE Simulator")
 # --- STABLE MIC PLACEMENT ---
 # Moving the recorder to a dedicated, stable top-level row to prevent 'Container not found' errors
 st.write("### 🎙️ Voice Interaction")
-audio_bytes = audio_recorder(
-    text="START RECORDING",
-    key='stable_clinical_mic'
-)
+with st.container():
+    try:
+        audio_bytes = audio_recorder(
+            text="START RECORDING",
+            key='stable_clinical_mic'
+        )
+    except Exception as e:
+        audio_bytes = None
+        st.error("Audio recorder failed to initialize. Please refresh the page and try again.")
 
 if audio_bytes:
     with st.spinner("Whisper is listening..."):
