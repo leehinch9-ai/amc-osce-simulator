@@ -4,7 +4,7 @@ from postgrest.exceptions import APIError
 from supabase import create_client, Client
 from audio_recorder_streamlit import audio_recorder
 import openai
-from openai.error import AuthenticationError, OpenAIError
+from openai import AuthenticationError, OpenAIError
 import io
 
 # --- 1. SECURE CONFIGURATION ---
