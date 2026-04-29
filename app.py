@@ -1,5 +1,5 @@
 import streamlit as st
-from groq import Groq
+from groq import Groq, AuthenticationError as GroqAuthenticationError
 from postgrest.exceptions import APIError
 from supabase import create_client, Client
 from audio_recorder_streamlit import audio_recorder
