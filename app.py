@@ -1,15 +1,27 @@
 import streamlit as st
 from groq import Groq
 from supabase import create_client, Client
-from streamlit_mic_recorder import mic_recorder
+from audio_recorder_streamlit import audio_recorder
 import openai
 import io
 
 # --- 1. SECURE CONFIGURATION ---
 SUPABASE_URL = "https://rmvabqsxupkaglxperuj.supabase.co"
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+
+def _get_secret(key: str):
+    try:
+        return st.secrets[key]
+    except Exception:
+        return None
+
+SUPABASE_KEY = _get_secret("SUPABASE_KEY")
+GROQ_API_KEY = _get_secret("GROQ_API_KEY")
+OPENAI_API_KEY = _get_secret("OPENAI_API_KEY")
+
+if not (SUPABASE_KEY and GROQ_API_KEY and OPENAI_API_KEY):
+    st.error("Missing Streamlit secrets: SUPABASE_KEY, GROQ_API_KEY, and OPENAI_API_KEY are required.")
+    st.stop()
+    raise RuntimeError("Missing Streamlit secrets")
 
 # Initialize Clients
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -89,20 +101,20 @@ station = st.session_state.current_station
 st.title("🩺 AMC Clinical OSCE Simulator")
 
 # --- STABLE MIC PLACEMENT ---
-# Moving the mic to a dedicated, stable top-level row to prevent 'Container not found' errors
+# Moving the recorder to a dedicated, stable top-level row to prevent 'Container not found' errors
 st.write("### 🎙️ Voice Interaction")
-audio_data = mic_recorder(
-    start_prompt="START RECORDING", 
-    stop_prompt="STOP & SEND", 
+audio_bytes = audio_recorder(
+    text="START RECORDING",
     key='stable_clinical_mic'
 )
 
-if audio_data:
+if audio_bytes:
     with st.spinner("Whisper is listening..."):
-        user_speech = transcribe_audio(audio_data['bytes'])
+        user_speech = transcribe_audio(audio_bytes)
     if user_speech:
         st.success(f"**Heard:** {user_speech}")
-        if "messages" not in st.session_state: st.session_state.messages = []
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
         st.session_state.messages.append({"role": "user", "content": user_speech})
         st.rerun()
 
