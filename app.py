@@ -125,7 +125,11 @@ with st.container():
         audio_bytes = None
         st.error("Audio recorder failed to initialize. Please refresh the page and try again.")
 
-if audio_bytes:
+if "last_audio_bytes" not in st.session_state:
+    st.session_state.last_audio_bytes = None
+
+if audio_bytes and audio_bytes != st.session_state.last_audio_bytes:
+    st.session_state.last_audio_bytes = audio_bytes
     with st.spinner("Whisper is listening..."):
         user_speech = transcribe_audio(audio_bytes)
     if user_speech:
@@ -168,21 +172,34 @@ with col2:
     # TRIGGER AI RESPONSE
     if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
         with chat_container:
-            with st.chat_message("assistant"):
-                try:
-                    completion = groq_client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=st.session_state.messages,
-                        temperature=0.5
+            try:
+                completion = groq_client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=st.session_state.messages,
+                    temperature=0.5
+                )
+
+                choice = completion.choices[0]
+                if hasattr(choice, "message"):
+                    ai_response = choice.message.content
+                elif isinstance(choice, dict):
+                    ai_response = (
+                        choice.get("message", {}).get("content")
+                        or choice.get("content")
+                        or choice.get("text")
+                        or str(choice)
                     )
-                    ai_response = completion.choices[0].message.content
-                    st.write(ai_response)
-                    st.session_state.messages.append({"role": "assistant", "content": ai_response})
-                    st.rerun()
-                except GroqAuthenticationError:
-                    st.error("Groq API error: invalid or missing GROQ_API_KEY. Please update `.streamlit/secrets.toml` with a valid key.")
-                except Exception as e:
-                    st.error(f"Groq Error: {e}")
+                else:
+                    ai_response = str(choice)
+
+                st.chat_message("assistant")
+                st.write(ai_response)
+                st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                st.rerun()
+            except GroqAuthenticationError:
+                st.error("Groq API error: invalid or missing GROQ_API_KEY. Please update `.streamlit/secrets.toml` with a valid key.")
+            except Exception as e:
+                st.error(f"Groq Error: {e}")
 
 # --- 6. VETTING & MARKING ---
 st.divider()
