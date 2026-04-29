@@ -1,5 +1,6 @@
 import streamlit as st
 from groq import Groq
+from postgrest.exceptions import APIError
 from supabase import create_client, Client
 from audio_recorder_streamlit import audio_recorder
 import openai
@@ -69,12 +70,16 @@ if not st.session_state.authenticated:
     st.title("🔐 Registrar Login")
     user_email = st.text_input("Enter Whitelisted Email")
     if st.button("Access Simulator"):
-        res = supabase.table("active_subscribers").select("*").eq("email", user_email.lower()).execute()
-        if res.data and res.data[0]['status'] == 'active':
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("Access Denied.")
+        try:
+            res = supabase.table("active_subscribers").select("*").eq("email", user_email.lower()).execute()
+            if res.data and res.data[0]['status'] == 'active':
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Access Denied.")
+        except APIError as e:
+            st.error("Supabase API error: invalid or missing `SUPABASE_KEY`. Please update `.streamlit/secrets.toml` with a valid Supabase key.")
+            st.stop()
     st.stop()
 
 # --- 4. STATION SELECTOR ---
