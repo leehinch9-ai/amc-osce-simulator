@@ -27,28 +27,17 @@ def transcribe_audio(audio_bytes):
         transcript = openai_client.audio.transcriptions.create(
             model="whisper-1",
             file=audio_file,
-            prompt="Doctor-patient clinical interview. Medical OSCE. Terms: Hello, History, Examination.",
+            prompt="Doctor-patient clinical interview. Medical OSCE terms: Hello, History, Examination, Symptoms.",
             response_format="text"
         )
         
-        # --- THE HALLUCINATION HAMMER ---
         clean_text = transcript.strip()
+        forbidden = ["thank you for watching", "thanks for watching", "un videos", "un.org", "social media", "subscribe"]
         
-        # Expanded list of forbidden 'YouTube-ism' phrases
-        forbidden = [
-            "thank you for watching", "thanks for watching", "un videos", 
-            "un.org", "social media", "subscribe", "please like", "share this video"
-        ]
-        
-        # Check if the transcript contains any forbidden phrases
         if any(phrase in clean_text.lower() for phrase in forbidden):
-            # If it's a hallucination, we'll try to see if 'Hello' was buried in there
-            # otherwise, we ignore it.
-            if "hello" in clean_text.lower():
-                return "Hello."
+            if "hello" in clean_text.lower(): return "Hello."
             return None
         
-        # Ignore very short, low-energy audio that Whisper turns into dots or noise
         if len(clean_text) <= 1 or clean_text in [".", "..", "..."]:
             return None
             
@@ -103,31 +92,37 @@ with col1:
 with col2:
     st.subheader("💬 Patient Interaction")
     
-    st.write("Click and speak to the patient:")
+    # --- DUAL INPUT SYSTEM ---
+    if "messages" not in st.session_state: 
+        st.session_state.messages = []
+
+    # 1. Voice Input
+    st.write("🎙️ Option A: Speak to the patient")
     audio_data = mic_recorder(
-        start_prompt="🎙️ START SPEAKING", 
-        stop_prompt="🛑 STOP & SEND", 
+        start_prompt="START SPEAKING", 
+        stop_prompt="STOP & SEND", 
         key='clinical_mic'
     )
 
     if audio_data:
         with st.spinner("Transcribing..."):
             user_speech = transcribe_audio(audio_data['bytes'])
-        
         if user_speech:
-            # SUCCESS PREVIEW
-            st.success(f"**You said:** {user_speech}")
-            
-            if "messages" not in st.session_state: st.session_state.messages = []
+            st.success(f"**Heard:** {user_speech}")
             st.session_state.messages.append({"role": "user", "content": user_speech})
-        else:
-            # If hallucination was caught, we show a tip instead of junk
-            st.warning("Speech too short or unclear. Please try speaking a full sentence.")
+            st.rerun()
 
-    # CHAT BOX
-    chat_container = st.container(height=450, border=True)
+    # 2. Text Input (The New Feature)
+    st.write("⌨️ Option B: Type your response")
+    text_input = st.chat_input("Type your clinical question here...")
+    if text_input:
+        st.session_state.messages.append({"role": "user", "content": text_input})
+        st.rerun()
+
+    # CHAT BOX DISPLAY
+    chat_container = st.container(height=400, border=True)
     with chat_container:
-        if not st.session_state.get("messages"):
+        if not st.session_state.messages:
             sys_msg = f"Act as the patient. Scenario: {station['content']}. Criteria: {station['marking_criteria']}. BE BRIEF."
             st.session_state.messages = [{"role": "system", "content": sys_msg}]
 
@@ -152,7 +147,7 @@ with col2:
 
 # --- 6. VETTING & MARKING ---
 st.divider()
-with st.expander("🔍 Examiner's Marking Criteria & Evidence"):
+with st.expander("🔍 Examiner's Marking Criteria"):
     st.markdown("### 📋 Marking Criteria")
     st.write(station.get('marking_criteria', 'No criteria available.'))
     
@@ -160,13 +155,6 @@ with st.expander("🔍 Examiner's Marking Criteria & Evidence"):
     if source_url and isinstance(source_url, str) and source_url.startswith("http"):
         st.link_button("View Evidence Source", source_url)
     
-    st.write("---")
-    st.write("### 🩺 Vetting Audit")
-    v_col1, v_col2 = st.columns(2)
-    with v_col1:
-        if st.button("✅ Approve Station"):
-            supabase.table("exam_recalls").update({"vetted": True}).eq("id", station['id']).execute()
-            st.success("Station vetted.")
-    with v_col2:
-        if st.button("🚩 Flag Inaccurate"):
-            st.warning("Flagged.")
+    if st.button("✅ Approve Station"):
+        supabase.table("exam_recalls").update({"vetted": True}).eq("id", station['id']).execute()
+        st.success("Station vetted.")
