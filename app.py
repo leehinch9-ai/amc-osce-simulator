@@ -4,6 +4,7 @@ from postgrest.exceptions import APIError
 from supabase import create_client, Client
 from audio_recorder_streamlit import audio_recorder
 import openai
+from openai.error import AuthenticationError, OpenAIError
 import io
 
 # --- 1. SECURE CONFIGURATION ---
@@ -58,6 +59,12 @@ def transcribe_audio(audio_bytes):
             return None
             
         return clean_text
+    except AuthenticationError:
+        st.error("OpenAI API error: invalid or missing OPENAI_API_KEY. Please update `.streamlit/secrets.toml` with your real OpenAI key.")
+        return None
+    except OpenAIError as e:
+        st.error(f"Whisper Error: {e}")
+        return None
     except Exception as e:
         st.error(f"Whisper Error: {e}")
         return None
