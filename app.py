@@ -38,7 +38,7 @@ def transcribe_audio(audio_bytes):
         return None
     
     audio_file = io.BytesIO(audio_bytes)
-    audio_file.name = "temp.wav"
+    audio_file.name = "temp.webm"
     try:
         transcript = openai_client.audio.transcriptions.create(
             model="whisper-1",
@@ -169,15 +169,20 @@ with col2:
     if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
         with chat_container:
             with st.chat_message("assistant"):
-                completion = groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=st.session_state.messages,
-                    temperature=0.5
-                )
-                ai_response = completion.choices[0].message.content
-                st.write(ai_response)
-                st.session_state.messages.append({"role": "assistant", "content": ai_response})
-                st.rerun()
+                try:
+                    completion = groq_client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=st.session_state.messages,
+                        temperature=0.5
+                    )
+                    ai_response = completion.choices[0].message.content
+                    st.write(ai_response)
+                    st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                    st.rerun()
+                except GroqAuthenticationError:
+                    st.error("Groq API error: invalid or missing GROQ_API_KEY. Please update `.streamlit/secrets.toml` with a valid key.")
+                except Exception as e:
+                    st.error(f"Groq Error: {e}")
 
 # --- 6. VETTING & MARKING ---
 st.divider()
