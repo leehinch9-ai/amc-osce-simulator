@@ -18,7 +18,7 @@ openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 st.set_page_config(page_title="AMC Clinical AI", page_icon="🩺", layout="wide")
 
-# --- 2. WHISPER TRANSCRIPTION ENGINE (With Hallucination Shield) ---
+# --- 2. WHISPER TRANSCRIPTION ENGINE (Anti-Hallucination V2) ---
 def transcribe_audio(audio_bytes):
     if not audio_bytes: return None
     audio_file = io.BytesIO(audio_bytes)
@@ -27,15 +27,29 @@ def transcribe_audio(audio_bytes):
         transcript = openai_client.audio.transcriptions.create(
             model="whisper-1",
             file=audio_file,
-            prompt="A medical doctor performing a clinical OSCE exam in Australia. Terms: Rivaroxaban, AF, ECG, JVP.",
+            prompt="Doctor-patient clinical interview. Medical OSCE. Terms: Hello, History, Examination.",
             response_format="text"
         )
         
-        # Hallucination Filter
-        bad_phrases = ["un.org", "un videos", "share this video", "thanks for watching", "social media", "subscribe"]
+        # --- THE HALLUCINATION HAMMER ---
         clean_text = transcript.strip()
         
-        if any(phrase in clean_text.lower() for phrase in bad_phrases) or len(clean_text) < 3:
+        # Expanded list of forbidden 'YouTube-ism' phrases
+        forbidden = [
+            "thank you for watching", "thanks for watching", "un videos", 
+            "un.org", "social media", "subscribe", "please like", "share this video"
+        ]
+        
+        # Check if the transcript contains any forbidden phrases
+        if any(phrase in clean_text.lower() for phrase in forbidden):
+            # If it's a hallucination, we'll try to see if 'Hello' was buried in there
+            # otherwise, we ignore it.
+            if "hello" in clean_text.lower():
+                return "Hello."
+            return None
+        
+        # Ignore very short, low-energy audio that Whisper turns into dots or noise
+        if len(clean_text) <= 1 or clean_text in [".", "..", "..."]:
             return None
             
         return clean_text
@@ -89,7 +103,6 @@ with col1:
 with col2:
     st.subheader("💬 Patient Interaction")
     
-    # VOICE INPUT AREA
     st.write("Click and speak to the patient:")
     audio_data = mic_recorder(
         start_prompt="🎙️ START SPEAKING", 
@@ -97,19 +110,19 @@ with col2:
         key='clinical_mic'
     )
 
-    # TRANSCRIPTION PREVIEW (The Update)
     if audio_data:
         with st.spinner("Transcribing..."):
             user_speech = transcribe_audio(audio_data['bytes'])
         
         if user_speech:
-            # Display what the AI heard in a green box
+            # SUCCESS PREVIEW
             st.success(f"**You said:** {user_speech}")
             
             if "messages" not in st.session_state: st.session_state.messages = []
             st.session_state.messages.append({"role": "user", "content": user_speech})
         else:
-            st.warning("No clear speech detected. Please try again.")
+            # If hallucination was caught, we show a tip instead of junk
+            st.warning("Speech too short or unclear. Please try speaking a full sentence.")
 
     # CHAT BOX
     chat_container = st.container(height=450, border=True)
